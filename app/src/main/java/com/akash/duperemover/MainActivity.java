@@ -164,14 +164,14 @@ public class MainActivity extends Activity {
     private void walkFiles(File root,List<Item> out,int kind){if(root==null||!root.exists())return;ArrayDeque<File> stack=new ArrayDeque<>();stack.push(root);Set<String> seen=new HashSet<>();
         while(!stack.isEmpty()){File d=stack.pop();try{String canonical=d.getCanonicalPath();if(!seen.add(canonical)||!canonical.equals(d.getAbsolutePath()))continue;}catch(Exception e){skippedCount++;continue;}
             if(d.getAbsolutePath().contains("/Android/data")||d.getAbsolutePath().contains("/Android/obb"))continue;
-            File[] children=d.listFiles();if(children==null){skippedCount++;continue;}for(File f:children){if(f.isDirectory()){stack.push(f);continue;}if(!f.isFile()||!f.canRead()||!wanted(f.getName(),kind))continue;
+            File[] children=d.listFiles();if(children==null){skippedCount++;continue;}for(File f:children){if(f.getName().startsWith("."))continue;if(f.isDirectory()){stack.push(f);continue;}if(!f.isFile()||!f.canRead()||!wanted(f.getName(),kind))continue;
                 Item i=new Item();i.file=f;i.name=f.getName();i.path=f.getAbsolutePath();i.size=f.length();i.modified=f.lastModified();i.kind=kind(i.name);i.image="Photos".equals(i.kind);out.add(i);if(out.size()%1000==0)say("Found "+out.size()+" files...");}}
     }
     private void walkTree(Uri tree,List<Item> out,int kind)throws Exception{String root=DocumentsContract.getTreeDocumentId(tree);ArrayDeque<String> pending=new ArrayDeque<>();pending.push(root);Set<String> seen=new HashSet<>();
         while(!pending.isEmpty()){String id=pending.pop();if(!seen.add(id))continue;Uri children=DocumentsContract.buildChildDocumentsUriUsingTree(tree,id);
             String[] cols={DocumentsContract.Document.COLUMN_DOCUMENT_ID,DocumentsContract.Document.COLUMN_DISPLAY_NAME,DocumentsContract.Document.COLUMN_MIME_TYPE,DocumentsContract.Document.COLUMN_SIZE,DocumentsContract.Document.COLUMN_LAST_MODIFIED};
             try(Cursor c=getContentResolver().query(children,cols,null,null,null)){if(c==null){skippedCount++;continue;}while(c.moveToNext()){
-                String child=c.getString(0),name=c.getString(1),mime=c.getString(2);if(DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)){pending.push(child);continue;}
+                String child=c.getString(0),name=c.getString(1),mime=c.getString(2);if(name!=null&&name.startsWith("."))continue;if(DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)){pending.push(child);continue;}
                 if(name==null||!wanted(name,kind)||c.isNull(3)){skippedCount++;continue;}Item i=new Item();i.uri=DocumentsContract.buildDocumentUriUsingTree(tree,child);i.name=name;i.path=child;i.size=c.getLong(3);i.modified=c.isNull(4)?0:c.getLong(4);i.kind=kind(name);i.image="Photos".equals(i.kind);out.add(i);
                 if(out.size()%1000==0)say("Found "+out.size()+" files...");}}
             catch(Exception ex){skippedCount++;}}
