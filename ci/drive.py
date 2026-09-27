@@ -95,6 +95,15 @@ def tap_node(n):
     x, y = center(n)
     run(['adb', 'shell', 'input', 'tap', str(x), str(y)])
 
+def screen_size():
+    r = run(['adb', 'shell', 'wm', 'size'])
+    m = re.search(r'(\d+)x(\d+)', r.stdout.decode('utf-8', 'ignore'))
+    return (int(m.group(1)), int(m.group(2))) if m else (1080, 1920)
+
+def swipe_up():
+    w, h = screen_size()
+    run(['adb', 'shell', 'input', 'swipe', str(w // 2), str(int(h * 0.7)), str(w // 2), str(int(h * 0.3)), '400'])
+
 def wait_node(timeout=30, **kw):
     end = time.time() + timeout
     xml = dump()
@@ -129,21 +138,54 @@ def tap_text(timeout=20, **kw):
     tap_node(n)
     return n
 
+def scroll_until(swipes=10, **kw):
+    for _ in range(swipes):
+        xml = dump()
+        anr = find_all(xml, regex=r"isn't responding")
+        if anr:
+            w = find_all(xml, text='Wait')
+            if w:
+                tap_node(w[0])
+                time.sleep(3)
+                continue
+        r = find_all(xml, **kw)
+        if r:
+            return xml, r[0]
+        swipe_up()
+        time.sleep(1.5)
+    return dump(), None
+
 def summary_text(xml):
     r = find_all(xml, regex=r'\d+ exact groups \|')
     return r[0].get('text') if r else ''
 
-def wait_scan_done(timeout=240):
+def wait_scan_done(timeout=300):
     xml, n = wait_node(timeout=timeout, contains='Scan complete')
     return xml, n
-
-def shell_ls(path):
-    r = run(['adb', 'shell', 'ls', path])
-    return r.stdout.decode('utf-8', 'ignore')
 
 def path_exists(p):
     r = run(['adb', 'shell', 'test', '-e', p, '&&', 'echo', 'YES'])
     return 'YES' in r.stdout.decode('utf-8', 'ignore')
+
+def confirm_and_delete(expect_button, expect_status, shot_name):
+    xml, n = wait_node(timeout=20, text=expect_button)
+    check('Select all exact -> %s' % expect_button, n is not None)
+    if n is None:
+        die('select-all button never showed ' + expect_button)
+    tap_node(n)
+    xml, n = wait_node(timeout=20, contains='PERMANENTLY deleted')
+    check('Permanent-delete confirmation dialog shown', n is not None)
+    shot(shot_name)
+    if n is None:
+        die('no confirm dialog')
+    tap_text(text='Delete permanently')
+    xml, n = wait_node(timeout=300, contains='files deleted')
+    status_nodes = find_all(xml, contains='files deleted')
+    st = status_nodes[0].get('text') if status_nodes else ''
+    check('Deletion reports %s' % expect_status, expect_status in st, st)
+    if n is None:
+        die('delete did not finish')
+    return xml
 
 run(['adb', 'logcat', '-c'])
 run(['adb', 'shell', 'wm', 'dismiss-keyguard'])
@@ -161,6 +203,7 @@ shot('01_home')
 if n is None:
     die('app did not launch or title missing')
 
+# --- S2: permission UX without granting yet ---
 if API >= 30:
     tap_text(text='Full phone')
     xml, n = wait_node(timeout=20, contains='All files access')
@@ -168,6 +211,56 @@ if API >= 30:
     shot('02_access_dialog')
     tap_text(text='Cancel')
     time.sleep(1)
+else:
+    tap_text(text='Full phone')
+    xml, n = wait_node(timeout=20, contains='Allow Duplicate File Remover')
+    check('Runtime permission dialog shown', n is not None)
+    shot('02_permission_dialog')
+    tap_text(regex=r'(?i)^deny$')
+    xml, n = wait_node(timeout=20, contains='denied')
+    check('Deny path shows guidance status', n is not None)
+
+# --- S3: folder (SAF) mode on DupeTest2 first, while its duplicate pair is intact ---
+tap_text(text='Choose folder')
+xml, n = wait_node(timeout=30, regex=r'(?i)(use this folder|show roots|internal|recent)')
+check('DocumentsUI picker opened', n is not None)
+shot('03_picker_open')
+xml, roots_btn = wait_node(timeout=5, desc='Show roots')
+if roots_btn is not None:
+    tap_node(roots_btn)
+    xml, n = wait_node(timeout=15, regex=r'(?i)(GB|MB) free')
+    if n is None:
+        xml, n = wait_node(timeout=5, regex=r'(?i)internal')
+    if n is not None:
+        tap_node(n)
+        time.sleep(2)
+xml, n = wait_node(timeout=20, text='DupeTest2')
+if n is not None:
+    tap_node(n)
+xml, n = wait_node(timeout=20, regex=r'(?i)^use this folder$')
+check('Picker shows Use this folder', n is not None)
+shot('04_picker_folder')
+if n is None:
+    die('could not navigate DocumentsUI to DupeTest2')
+tap_node(n)
+xml, n = wait_node(timeout=15, regex=r'(?i)^allow$')
+if n is not None:
+    tap_node(n)
+xml, n = wait_scan_done()
+st = summary_text(xml)
+check('Folder-mode scan completes', n is not None)
+if n is None:
+    die('folder-mode scan did not complete')
+check('Folder-mode finds 1 exact group', '1 exact groups | 0 similar' in st, st)
+shot('05_folder_results')
+tap_text(text='Select all exact')
+confirm_and_delete('Delete (1)', '1 files deleted; 0 skipped', '06_folder_delete')
+shot('07_folder_deleted')
+check('SAF delete removed saf2.txt', not path_exists('/sdcard/DupeTest2/saf2.txt'))
+check('SAF keep saf1.txt survives', path_exists('/sdcard/DupeTest2/saf1.txt'))
+
+# --- S4: switch to full-phone mode ---
+if API >= 30:
     run(['adb', 'shell', 'appops', 'set', PKG, 'MANAGE_EXTERNAL_STORAGE', 'allow'])
     r = run(['adb', 'shell', 'appops', 'get', PKG, 'MANAGE_EXTERNAL_STORAGE'])
     check('MANAGE_EXTERNAL_STORAGE granted via appops', 'allow' in r.stdout.decode('utf-8', 'ignore').lower())
@@ -175,14 +268,7 @@ if API >= 30:
 else:
     tap_text(text='Full phone')
     xml, n = wait_node(timeout=20, contains='Allow Duplicate File Remover')
-    check('Runtime permission dialog shown', n is not None)
-    shot('02_permission_dialog')
     if n is not None:
-        tap_text(regex=r'(?i)^deny$')
-        xml, n = wait_node(timeout=20, contains='denied')
-        check('Deny path shows guidance status', n is not None)
-        tap_text(text='Full phone')
-        xml, n = wait_node(timeout=20, contains='Allow Duplicate File Remover')
         tap_text(regex=r'(?i)^allow$')
 
 xml, n = wait_scan_done()
@@ -197,18 +283,28 @@ check('Report lists Photos: 4 extra copies', 'Photos: 4' in rep_text, rep_text[:
 check('Report lists Documents: 2 extra copies', 'Documents: 2' in rep_text, rep_text[:200])
 check('Report lists Videos: 1 extra copy', 'Videos: 1' in rep_text, rep_text[:200])
 check('Report counts DupeTest folder copies', 'DupeTest: 6' in rep_text, rep_text[:300])
-shot('03_results')
+check('Report counts DupeTest/sub copy', 'DupeTest/sub: 1' in rep_text, rep_text[:300])
+shot('08_results')
 
-imgs = find_all(xml, clazz='ImageView', clickable=True)
-if imgs:
-    tap_node(imgs[0])
+# --- S5: thumbnail preview (scroll until a photo card is visible) ---
+xml, img = scroll_until(clazz='ImageView', clickable=True)
+if img is not None:
+    tap_node(img)
     xml, n = wait_node(timeout=20, text='Close')
     check('Thumbnail opens preview dialog', n is not None)
-    shot('04_preview')
+    shot('09_preview')
     tap_text(text='Close')
+    run(['adb', 'shell', 'input', 'keyevent', '4'])
+    xml = dump()
+    anr = find_all(xml, regex=r"isn't responding")
+    if anr:
+        w = find_all(xml, text='Wait')
+        if w:
+            tap_node(w[0])
 else:
-    check('Thumbnail opens preview dialog', False, 'no clickable ImageView found')
+    check('Thumbnail opens preview dialog', False, 'no clickable ImageView found after scrolling')
 
+# --- S6: type filters ---
 for name, exp in [('Photos', '3 exact groups | 1 similar'),
                   ('Videos', '1 exact groups | 0 similar'),
                   ('Documents', '2 exact groups | 0 similar'),
@@ -220,24 +316,12 @@ for name, exp in [('Photos', '3 exact groups | 1 similar'),
     st = summary_text(xml)
     check('Filter %s scan completes' % name, n is not None)
     check('Filter %s summary = %s' % (name, exp), exp in st, st)
-    shot('05_filter_' + name.lower().replace(' ', '_'))
+    shot('10_filter_' + name.lower().replace(' ', '_'))
 
+# --- S7: select all exact + permanent delete ---
 tap_text(text='Select all exact')
-xml, n = wait_node(timeout=20, text='Delete (7)')
-check('Select all exact marks 7 extra copies', n is not None)
-if n is not None:
-    tap_node(n)
-xml, n = wait_node(timeout=20, contains='PERMANENTLY deleted')
-check('Permanent-delete confirmation dialog shown', n is not None)
-shot('06_confirm_delete')
-tap_text(text='Delete permanently')
-xml, n = wait_node(timeout=300, contains='files deleted')
-status_nodes = find_all(xml, contains='files deleted')
-st = status_nodes[0].get('text') if status_nodes else ''
-check('Deletion reports 7 deleted, 0 skipped', '7 files deleted; 0 skipped' in st, st)
-shot('07_after_delete')
-if n is None:
-    die('delete did not finish')
+confirm_and_delete('Delete (7)', '7 files deleted; 0 skipped', '11_confirm_delete')
+shot('12_after_delete')
 
 for p in ['/sdcard/DupeTest/photoA_copy.jpg', '/sdcard/DupeTest/sub/photoA_third.jpg',
           '/sdcard/DupeTest/big2.jpg', '/sdcard/DupeTest/empty2.jpg',
@@ -250,56 +334,6 @@ for p in ['/sdcard/DupeTest/photoA.jpg', '/sdcard/DupeTest/big1.jpg',
           '/sdcard/DupeTest/sim_base.jpg', '/sdcard/DupeTest/sim_tweak.jpg',
           '/sdcard/DupeTest/unique_photo.jpg', '/sdcard/DupeTest/doc2.txt']:
     check('KEEP survives: ' + p, path_exists(p))
-
-# Folder (SAF) mode against DupeTest2
-tap_text(text='Choose folder')
-xml, n = wait_node(timeout=25, desc='Show roots')
-if n is None:
-    xml, n = wait_node(timeout=10, regex=r'(?i)use this folder')
-check('DocumentsUI picker opened', n is not None)
-shot('08_picker')
-xml, roots_btn = wait_node(timeout=5, desc='Show roots')
-if roots_btn is not None:
-    tap_node(roots_btn)
-    xml, n = wait_node(timeout=15, regex=r'(?i)(GB|MB) free')
-    if n is None:
-        xml, n = wait_node(timeout=5, contains='Internal')
-    if n is not None:
-        tap_node(n)
-        time.sleep(2)
-xml, n = wait_node(timeout=20, text='DupeTest2')
-if n is not None:
-    tap_node(n)
-xml, n = wait_node(timeout=20, regex=r'(?i)use this folder')
-check('Picker shows Use this folder', n is not None)
-shot('09_picker_folder')
-if n is not None:
-    tap_node(n)
-    xml, n = wait_node(timeout=15, regex=r'(?i)^allow$')
-    if n is not None:
-        tap_node(n)
-xml, n = wait_scan_done()
-st = summary_text(xml)
-check('Folder-mode scan completes', n is not None)
-if n is None:
-    die('folder-mode scan did not complete')
-check('Folder-mode finds 1 exact group', '1 exact groups | 0 similar' in st, st)
-shot('10_folder_results')
-tap_text(text='Select all exact')
-xml, n = wait_node(timeout=20, text='Delete (1)')
-check('Folder-mode select-all marks 1', n is not None)
-if n is not None:
-    tap_node(n)
-xml, n = wait_node(timeout=15, text='Delete permanently')
-if n is not None:
-    tap_node(n)
-xml, n = wait_node(timeout=120, contains='files deleted')
-status_nodes = find_all(xml, contains='files deleted')
-st = status_nodes[0].get('text') if status_nodes else ''
-check('Folder-mode deletion reports 1 deleted, 0 skipped', '1 files deleted; 0 skipped' in st, st)
-shot('11_folder_deleted')
-check('SAF delete removed saf2.txt', not path_exists('/sdcard/DupeTest2/saf2.txt'))
-check('SAF keep saf1.txt survives', path_exists('/sdcard/DupeTest2/saf1.txt'))
 
 r = run(['adb', 'logcat', '-d'])
 log = r.stdout.decode('utf-8', 'ignore')
