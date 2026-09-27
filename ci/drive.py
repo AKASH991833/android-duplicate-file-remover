@@ -267,6 +267,14 @@ if n is None:
 # somehow land elsewhere, open the drawer and tap the Downloads root.
 xml, n = wait_node(timeout=8, regex=r'(?i)allow access to')
 if n is None:
+    # API 30+ tree picker can open on the storage root: enter Download,
+    # then the enabled USE THIS FOLDER button grants it.
+    xml, d = wait_node(timeout=10, text='Download')
+    if d is not None:
+        tap_node(d)
+        time.sleep(2)
+        xml, n = wait_node(timeout=10, regex=r'(?i)^use this folder$')
+if n is None:
     xml, t = wait_node(timeout=5, desc='Show roots')
     if t is None:
         xml, t = wait_node(timeout=5, text='Open from')
@@ -280,7 +288,7 @@ if n is None:
         tap_node(d)
         time.sleep(2)
     xml, n = wait_node(timeout=10, regex=r'(?i)allow access to')
-check('Picker shows Allow-access-to-Downloads button', n is not None)
+check('Picker shows Allow-access/Use-this-folder button', n is not None)
 shot('04_picker_folder')
 if n is None:
     nav_debug('allowbtn', dump())
