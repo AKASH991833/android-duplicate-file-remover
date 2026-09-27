@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 jobs:
   emu-test:
-    runs-on: ubuntu-latest
+    runs-on: macos-13
     timeout-minutes: 45
     permissions:
       contents: write
@@ -26,7 +26,7 @@ jobs:
       - name: Seed test files
         run: |
           set -e
-          command -v convert >/dev/null || { sudo apt-get update && sudo apt-get install -y imagemagick; }
+          command -v convert >/dev/null || brew install imagemagick
           cd "$GITHUB_WORKSPACE"
           mkdir -p seeds/DupeTest/sub seeds/DupeTest2
           convert -size 800x600 plasma:fractal -quality 85 seeds/DupeTest/photoA.jpg
