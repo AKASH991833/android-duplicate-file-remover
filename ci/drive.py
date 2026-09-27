@@ -266,14 +266,27 @@ if n is None:
 # the picker opens on it with an enabled "ALLOW ACCESS TO ..." button. If we
 # somehow land elsewhere, open the drawer and tap the Downloads root.
 xml, n = wait_node(timeout=8, regex=r'(?i)allow access to')
+if n is not None:
+    # Picker opened on the Downloads root (API 29 CI image). The saf pair
+    # lives in the safdir subfolder, so enter it and grant that instead.
+    xml, d = wait_node(timeout=5, text='safdir')
+    if d is not None:
+        tap_node(d)
+        time.sleep(2)
+        xml, n = wait_node(timeout=10, regex=r'(?i)(use this folder|allow access to)')
 if n is None:
-    # API 30+ tree picker can open on the storage root: enter Download,
-    # then the enabled USE THIS FOLDER button grants it.
+    # API 30+ tree picker opens on the storage root and blocks granting the
+    # Download root itself ("Can't use this folder"). Enter Download, then
+    # the safdir subfolder, and grant that with USE THIS FOLDER.
     xml, d = wait_node(timeout=10, text='Download')
     if d is not None:
         tap_node(d)
         time.sleep(2)
-        xml, n = wait_node(timeout=10, regex=r'(?i)^use this folder$')
+    xml, d = wait_node(timeout=10, text='safdir')
+    if d is not None:
+        tap_node(d)
+        time.sleep(2)
+    xml, n = wait_node(timeout=10, regex=r'(?i)^use this folder$')
 if n is None:
     xml, t = wait_node(timeout=5, desc='Show roots')
     if t is None:
@@ -307,8 +320,8 @@ shot('05_folder_results')
 tap_text(text='Select all exact')
 confirm_and_delete('Delete (1)', '1 files deleted; 0 skipped', '06_folder_delete')
 shot('07_folder_deleted')
-check('SAF delete removed saf2.txt', not path_exists('/sdcard/Download/saf2.txt'))
-check('SAF keep saf1.txt survives', path_exists('/sdcard/Download/saf1.txt'))
+check('SAF delete removed saf2.txt', not path_exists('/sdcard/Download/safdir/saf2.txt'))
+check('SAF keep saf1.txt survives', path_exists('/sdcard/Download/safdir/saf1.txt'))
 
 # --- S4: switch to full-phone mode ---
 if API >= 30:
