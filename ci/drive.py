@@ -99,6 +99,16 @@ def wait_node(timeout=30, **kw):
     end = time.time() + timeout
     xml = dump()
     while time.time() < end:
+        anr = find_all(xml, regex=r"isn't responding")
+        if anr:
+            w = find_all(xml, text='Wait')
+            if w:
+                print('ANR dialog seen - tapping Wait', flush=True)
+                tap_node(w[0])
+                time.sleep(3)
+                xml = dump()
+                end += 30
+                continue
         r = find_all(xml, **kw)
         if r:
             return xml, r[0]
