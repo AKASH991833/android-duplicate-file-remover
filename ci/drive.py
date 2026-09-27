@@ -178,12 +178,12 @@ else:
     check('Runtime permission dialog shown', n is not None)
     shot('02_permission_dialog')
     if n is not None:
-        tap_text(regex=r'(?i)deny')
+        tap_text(regex=r'(?i)^deny$')
         xml, n = wait_node(timeout=20, contains='denied')
         check('Deny path shows guidance status', n is not None)
         tap_text(text='Full phone')
         xml, n = wait_node(timeout=20, contains='Allow Duplicate File Remover')
-        tap_text(regex=r'(?i)allow')
+        tap_text(regex=r'(?i)^allow$')
 
 xml, n = wait_scan_done()
 st = summary_text(xml)
