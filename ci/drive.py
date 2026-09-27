@@ -14,6 +14,26 @@ def check(name, cond, extra=''):
     results.append((name, bool(cond)))
     print(('PASS' if cond else 'FAIL') + ': ' + name + (' | ' + str(extra) if extra else ''), flush=True)
 
+def finish(code):
+    with open(os.path.join(OUT, 'results.txt'), 'w') as f:
+        for name, ok in results:
+            f.write(('PASS' if ok else 'FAIL') + ': ' + name + '\n')
+    r = run(['adb', 'logcat', '-d'])
+    with open(os.path.join(OUT, 'logcat.txt'), 'w') as f:
+        f.write(r.stdout.decode('utf-8', 'ignore'))
+    failed = [n for n, ok in results if not ok]
+    print('==== %d/%d checks passed ====' % (len(results) - len(failed), len(results)), flush=True)
+    sys.exit(code)
+
+def die(msg):
+    print('ABORT: ' + msg, flush=True)
+    xml = dump()
+    save_debug(xml, 'die')
+    r = run(['adb', 'shell', 'dumpsys', 'window', 'windows'])
+    with open(os.path.join(OUT, 'windows.txt'), 'w') as f:
+        f.write(r.stdout.decode('utf-8', 'ignore'))
+    finish(1)
+
 def shot(name):
     p = os.path.join(OUT, name + '.png')
     r = run(['adb', 'exec-out', 'screencap', '-p'])
@@ -103,7 +123,7 @@ def summary_text(xml):
     r = find_all(xml, regex=r'\d+ exact groups \|')
     return r[0].get('text') if r else ''
 
-def wait_scan_done(timeout=600):
+def wait_scan_done(timeout=240):
     xml, n = wait_node(timeout=timeout, contains='Scan complete')
     return xml, n
 
@@ -123,10 +143,13 @@ apk = os.environ.get('APK_PATH', 'app/build/outputs/apk/debug/app-debug.apk')
 r = run(['adb', 'install', '-r', apk])
 check('APK installs', b'Success' in r.stdout, r.stdout.decode('utf-8', 'ignore')[-200:])
 
-run(['adb', 'shell', 'am', 'start', '-n', PKG + '/.MainActivity'])
-xml, n = wait_node(timeout=60, text='Duplicate File Remover')
+r = run(['adb', 'shell', 'am', 'start', '-n', PKG + '/.MainActivity'])
+print('am start: ' + r.stdout.decode('utf-8', 'ignore').strip()[:300], flush=True)
+xml, n = wait_node(timeout=120, text='Duplicate File Remover')
 check('App launches, home screen shown', n is not None)
 shot('01_home')
+if n is None:
+    die('app did not launch or title missing')
 
 if API >= 30:
     tap_text(text='Full phone')
@@ -155,6 +178,8 @@ else:
 xml, n = wait_scan_done()
 st = summary_text(xml)
 check('Full-phone scan completes', n is not None)
+if n is None:
+    die('full-phone scan did not complete')
 check('All-filter summary shows 6 exact / 1 similar group', '6 exact groups | 1 similar' in st, st)
 rep = find_all(xml, contains='By folder')
 rep_text = rep[0].get('text') if rep else ''
@@ -201,6 +226,8 @@ status_nodes = find_all(xml, contains='files deleted')
 st = status_nodes[0].get('text') if status_nodes else ''
 check('Deletion reports 7 deleted, 0 skipped', '7 files deleted; 0 skipped' in st, st)
 shot('07_after_delete')
+if n is None:
+    die('delete did not finish')
 
 for p in ['/sdcard/DupeTest/photoA_copy.jpg', '/sdcard/DupeTest/sub/photoA_third.jpg',
           '/sdcard/DupeTest/big2.jpg', '/sdcard/DupeTest/empty2.jpg',
@@ -244,6 +271,8 @@ if n is not None:
 xml, n = wait_scan_done()
 st = summary_text(xml)
 check('Folder-mode scan completes', n is not None)
+if n is None:
+    die('folder-mode scan did not complete')
 check('Folder-mode finds 1 exact group', '1 exact groups | 0 similar' in st, st)
 shot('10_folder_results')
 tap_text(text='Select all exact')
@@ -264,15 +293,6 @@ check('SAF keep saf1.txt survives', path_exists('/sdcard/DupeTest2/saf1.txt'))
 
 r = run(['adb', 'logcat', '-d'])
 log = r.stdout.decode('utf-8', 'ignore')
-with open(os.path.join(OUT, 'logcat.txt'), 'w') as f:
-    f.write(log)
 fatals = [l for l in log.splitlines() if 'FATAL EXCEPTION' in l]
 check('No FATAL EXCEPTION in logcat', not fatals, fatals[:3])
-
-with open(os.path.join(OUT, 'results.txt'), 'w') as f:
-    for name, ok in results:
-        f.write(('PASS' if ok else 'FAIL') + ': ' + name + '\n')
-
-failed = [n for n, ok in results if not ok]
-print('==== %d/%d checks passed ====' % (len(results) - len(failed), len(results)), flush=True)
-sys.exit(1 if failed else 0)
+finish(1 if any(not ok for _, ok in results) else 0)
