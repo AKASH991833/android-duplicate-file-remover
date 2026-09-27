@@ -255,60 +255,36 @@ def tap_storage_root(xml):
     return False
 
 tap_text(text='Choose folder')
-xml, n = wait_node(timeout=30, regex=r'(?i)(use this folder|open from|show roots|files on|no items)')
+xml, n = wait_node(timeout=30, regex=r'(?i)(use this folder|allow access|open from|show roots|files on|no items)')
 check('DocumentsUI picker opened', n is not None)
 shot('03_picker_open')
 if n is None:
     nav_debug('picker_missing', dump())
     die('DocumentsUI picker never opened')
 
-# Are we already on the storage root (folder list visible)?
-xml = dump()
-if 'DupeTest2' not in xml:
-    # switch root: open the roots drawer
+# On the stripped CI emulator images the roots drawer exposes Downloads only;
+# the picker opens on it with an enabled "ALLOW ACCESS TO ..." button. If we
+# somehow land elsewhere, open the drawer and tap the Downloads root.
+xml, n = wait_node(timeout=8, regex=r'(?i)allow access to')
+if n is None:
     xml, t = wait_node(timeout=5, desc='Show roots')
     if t is None:
         xml, t = wait_node(timeout=5, text='Open from')
     if t is not None:
         tap_node(t)
         time.sleep(2)
-    else:
-        # fallback: drag the drawer in from the left edge
-        w, h = screen_size()
-        run(['adb', 'shell', 'input', 'swipe', '5', str(h // 2), str(w // 2), str(h // 2), '300'])
-        time.sleep(2)
     xml = dump()
     nav_debug('drawer', xml)
-    ok = tap_storage_root(xml)
-    xml = dump()
-    nav_debug('after_root', xml)
-    check('Storage root found in picker', ok)
-else:
-    check('Storage root found in picker', True)
-
-xml, n = wait_node(timeout=20, text='DupeTest2')
-if n is None:
-    xml, n = scroll_until(text='DupeTest2', swipes=6)
-check('DupeTest2 folder visible in picker', n is not None)
-if n is None:
-    nav_debug('folders', dump())
-    die('could not navigate DocumentsUI to DupeTest2')
-tap_node(n)
-time.sleep(2)
-
-xml, n = wait_node(timeout=20, regex=r'(?i)use this folder')
-if n is None:
-    # some builds expose the bottom button with an empty label: fall back to its id
-    xml = dump()
-    rid = [b for b in find_all(xml, clazz='Button', clickable=True)
-           if (b.get('resource-id') or '').endswith('button1')]
-    if rid:
-        n = rid[0]
-check('Picker shows Use this folder', n is not None)
+    xml, d = wait_node(timeout=10, text='Downloads')
+    if d is not None:
+        tap_node(d)
+        time.sleep(2)
+    xml, n = wait_node(timeout=10, regex=r'(?i)allow access to')
+check('Picker shows Allow-access-to-Downloads button', n is not None)
 shot('04_picker_folder')
 if n is None:
-    nav_debug('usefolder', dump())
-    die('could not reach Use this folder button')
+    nav_debug('allowbtn', dump())
+    die('could not reach Allow access button in picker')
 tap_node(n)
 xml, n = wait_node(timeout=15, regex=r'(?i)^allow$')
 if n is not None:
@@ -323,8 +299,8 @@ shot('05_folder_results')
 tap_text(text='Select all exact')
 confirm_and_delete('Delete (1)', '1 files deleted; 0 skipped', '06_folder_delete')
 shot('07_folder_deleted')
-check('SAF delete removed saf2.txt', not path_exists('/sdcard/DupeTest2/saf2.txt'))
-check('SAF keep saf1.txt survives', path_exists('/sdcard/DupeTest2/saf1.txt'))
+check('SAF delete removed saf2.txt', not path_exists('/sdcard/Download/saf2.txt'))
+check('SAF keep saf1.txt survives', path_exists('/sdcard/Download/saf1.txt'))
 
 # --- S4: switch to full-phone mode ---
 if API >= 30:
