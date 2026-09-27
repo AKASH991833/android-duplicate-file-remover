@@ -179,7 +179,7 @@ public class MainActivity extends Activity {
     private InputStream open(Item i)throws Exception{return i.file!=null?new FileInputStream(i.file):getContentResolver().openInputStream(i.uri);}
     private String hex(byte[] bytes){StringBuilder b=new StringBuilder();for(byte x:bytes)b.append(String.format(Locale.ROOT,"%02x",x&255));return b.toString();}
     private String quick(Item i)throws Exception{MessageDigest h=MessageDigest.getInstance("SHA-256");int chunk=65536;
-        if(i.file!=null){try(RandomAccessFile r=new RandomAccessFile(i.file,"r")){byte[] b=new byte[chunk];int n=r.read(b);if(n>0)h.update(b,0,n);// First chunk only: same fingerprint on File and SAF providers.}}
+        if(i.file!=null){try(RandomAccessFile r=new RandomAccessFile(i.file,"r")){byte[] b=new byte[chunk];int n=r.read(b);if(n>0)h.update(b,0,n);}} // First chunk only: same fingerprint on File and SAF providers.
         else {try(InputStream in=open(i)){if(in==null)throw new Exception("Unreadable");byte[] b=new byte[chunk];int n=in.read(b);if(n>0)h.update(b,0,n);
             // SAF providers generally do not support seeking. Full hash below is the authoritative check.
         }}return hex(h.digest());}
