@@ -336,14 +336,16 @@ if img is not None:
     xml, n = wait_node(timeout=20, regex=r'(?i)^close$')
     check('Thumbnail opens preview dialog', n is not None)
     shot('09_preview')
-    tap_text(regex=r'(?i)^close$')
-    run(['adb', 'shell', 'input', 'keyevent', '4'])
-    xml = dump()
-    anr = find_all(xml, regex=r"isn't responding")
-    if anr:
-        w = find_all(xml, text='Wait')
-        if w:
-            tap_node(w[0])
+    if tap_text(regex=r'(?i)^close$') is None:
+        # Close tap missed - BACK only as a dialog-dismiss fallback;
+        # pressing BACK after a successful close would exit the app.
+        run(['adb', 'shell', 'input', 'keyevent', '4'])
+    time.sleep(1)
+    xml, n = wait_node(timeout=20, text='Select all exact')
+    check('Back on results screen after preview', n is not None)
+    if n is None:
+        save_debug(xml, 'after_preview')
+        die('results screen not reachable after preview close')
 else:
     check('Thumbnail opens preview dialog', False, 'no clickable ImageView found after scrolling')
 
