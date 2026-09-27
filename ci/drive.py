@@ -209,7 +209,7 @@ if API >= 30:
     xml, n = wait_node(timeout=20, contains='All files access')
     check('All-files-access explanation dialog shown before any grant', n is not None)
     shot('02_access_dialog')
-    tap_text(text='Cancel')
+    tap_text(regex=r'(?i)^cancel$')
     time.sleep(1)
 else:
     tap_text(text='Full phone')
