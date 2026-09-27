@@ -5,6 +5,6 @@
     <path android:fillColor="#5199FF" android:pathData="M32,29h30a5,5 0,0 1,5 5v35a5,5 0,0 1,-5 5h-30a5,5 0,0 1,-5 -5v-35a5,5 0,0 1,5 -5z"/>
     <path android:fillColor="#F2F9FF" android:pathData="M39,22h30a5,5 0,0 1,5 5v35a5,5 0,0 1,-5 5h-30a5,5 0,0 1,-5 -5v-35a5,5 0,0 1,5 -5z"/>
     <path android:strokeColor="#7596B9" android:strokeWidth="2" android:strokeLineCap="round" android:pathData="M47,37h18 M47,45h18 M47,53h18"/>
-    <path android:fillColor="#36D996" android:pathData="M68,61m-18,0a18,18 0,1 0,36 0a18,18 0,1 0,-36 0"/>
+    <path android:fillColor="#36D996" android:pathData="M50,61 A18,18 0 1,0 86,61 A18,18 0 1,0 50,61 Z"/>
     <path android:strokeColor="#103B3B" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M59,61l7,7 13,-15"/>
 </vector>
