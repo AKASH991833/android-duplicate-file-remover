@@ -221,33 +221,94 @@ else:
     check('Deny path shows guidance status', n is not None)
 
 # --- S3: folder (SAF) mode on DupeTest2 first, while its duplicate pair is intact ---
+MEDIA_ROOTS = ('recent', 'images', 'videos', 'audio', 'documents', 'downloads')
+CTRL_RE = re.compile(r'(?i)(use this folder|cancel|show roots|list view|grid view|more options|search|sort|no items|files on|select all|new folder)')
+
+def nav_debug(tag, xml):
+    texts, descs = [], []
+    try:
+        for x in ET.fromstring(xml).iter('node'):
+            if (x.get('text') or ''): texts.append(x.get('text'))
+            if (x.get('content-desc') or ''): descs.append(x.get('content-desc'))
+    except Exception:
+        pass
+    with open(os.path.join(OUT, 'nav_%s.txt' % tag), 'w') as f:
+        f.write('texts: %r\ndescs: %r\n' % (sorted(set(texts)), sorted(set(descs))))
+
+def tap_storage_root(xml):
+    # 1) free-space summary row ("4.2 GB free") is unique to the device storage root
+    r = find_all(xml, regex=r'(?i)\d+(\.\d+)?\s?[KMG]B\s+(available|free)')
+    if r:
+        tap_node(r[0]); time.sleep(2); return True
+    # 2) device-model / internal-storage label heuristics
+    for pat in (r'(?i)(sdk_|gphone|pixel|emulator|emu\d|internal storage|phone storage|shared storage)',):
+        r = [n for n in find_all(xml, regex=pat)
+             if (n.get('text') or '').strip().lower() not in MEDIA_ROOTS]
+        if r:
+            tap_node(r[0]); time.sleep(2); return True
+    # 3) any drawer row title that is not a known media root or a control
+    for n in find_all(xml):
+        t = (n.get('text') or '').strip()
+        if t and t.lower() not in MEDIA_ROOTS and not CTRL_RE.search(t) \
+                and not re.search(r'(?i)\b(KB|MB|GB)\b', t) and len(t) < 40:
+            tap_node(n); time.sleep(2); return True
+    return False
+
 tap_text(text='Choose folder')
-xml, n = wait_node(timeout=30, regex=r'(?i)(use this folder|open from|show roots|files on)')
+xml, n = wait_node(timeout=30, regex=r'(?i)(use this folder|open from|show roots|files on|no items)')
 check('DocumentsUI picker opened', n is not None)
 shot('03_picker_open')
-xml, t = wait_node(timeout=5, desc='Show roots')
-if t is None:
-    xml, t = wait_node(timeout=5, text='Open from')
-if t is not None:
-    tap_node(t)
-    time.sleep(2)
-xml, n = wait_node(timeout=15, regex=r'(?i)(GB|MB|KB) free')
 if n is None:
-    xml, n = wait_node(timeout=5, regex=r'(?i)(internal shared|sdk_|pixel|emulator)')
-check('Storage root found in picker', n is not None)
-if n is not None:
-    tap_node(n)
-    time.sleep(2)
+    nav_debug('picker_missing', dump())
+    die('DocumentsUI picker never opened')
+
+# Are we already on the storage root (folder list visible)?
+xml = dump()
+if 'DupeTest2' not in xml:
+    # switch root: open the roots drawer
+    xml, t = wait_node(timeout=5, desc='Show roots')
+    if t is None:
+        xml, t = wait_node(timeout=5, text='Open from')
+    if t is not None:
+        tap_node(t)
+        time.sleep(2)
+    else:
+        # fallback: drag the drawer in from the left edge
+        w, h = screen_size()
+        run(['adb', 'shell', 'input', 'swipe', '5', str(h // 2), str(w // 2), str(h // 2), '300'])
+        time.sleep(2)
+    xml = dump()
+    nav_debug('drawer', xml)
+    ok = tap_storage_root(xml)
+    xml = dump()
+    nav_debug('after_root', xml)
+    check('Storage root found in picker', ok)
+else:
+    check('Storage root found in picker', True)
+
 xml, n = wait_node(timeout=20, text='DupeTest2')
 if n is None:
     xml, n = scroll_until(text='DupeTest2', swipes=6)
-if n is not None:
-    tap_node(n)
-xml, n = wait_node(timeout=20, regex=r'(?i)^use this folder$')
+check('DupeTest2 folder visible in picker', n is not None)
+if n is None:
+    nav_debug('folders', dump())
+    die('could not navigate DocumentsUI to DupeTest2')
+tap_node(n)
+time.sleep(2)
+
+xml, n = wait_node(timeout=20, regex=r'(?i)use this folder')
+if n is None:
+    # some builds expose the bottom button with an empty label: fall back to its id
+    xml = dump()
+    rid = [b for b in find_all(xml, clazz='Button', clickable=True)
+           if (b.get('resource-id') or '').endswith('button1')]
+    if rid:
+        n = rid[0]
 check('Picker shows Use this folder', n is not None)
 shot('04_picker_folder')
 if n is None:
-    die('could not navigate DocumentsUI to DupeTest2')
+    nav_debug('usefolder', dump())
+    die('could not reach Use this folder button')
 tap_node(n)
 xml, n = wait_node(timeout=15, regex=r'(?i)^allow$')
 if n is not None:
