@@ -68,7 +68,8 @@ jobs:
             adb shell input keyevent 82
             mkdir -p "$GITHUB_WORKSPACE/out"
             adb push "$GITHUB_WORKSPACE/seeds/DupeTest" /sdcard/DupeTest
-            adb push "$GITHUB_WORKSPACE/seeds/DupeTest2" /sdcard/DupeTest2
+            adb push "$GITHUB_WORKSPACE/seeds/DupeTest2/saf1.txt" /sdcard/Download/saf1.txt
+            adb push "$GITHUB_WORKSPACE/seeds/DupeTest2/saf2.txt" /sdcard/Download/saf2.txt
             adb shell ls -R /sdcard/DupeTest
             python3 ci/drive.py ${{ matrix.api-level }}
       - name: Publish screenshots branch
