@@ -222,19 +222,25 @@ else:
 
 # --- S3: folder (SAF) mode on DupeTest2 first, while its duplicate pair is intact ---
 tap_text(text='Choose folder')
-xml, n = wait_node(timeout=30, regex=r'(?i)(use this folder|show roots|internal|recent)')
+xml, n = wait_node(timeout=30, regex=r'(?i)(use this folder|open from|show roots|files on)')
 check('DocumentsUI picker opened', n is not None)
 shot('03_picker_open')
-xml, roots_btn = wait_node(timeout=5, desc='Show roots')
-if roots_btn is not None:
-    tap_node(roots_btn)
-    xml, n = wait_node(timeout=15, regex=r'(?i)(GB|MB) free')
-    if n is None:
-        xml, n = wait_node(timeout=5, regex=r'(?i)internal')
-    if n is not None:
-        tap_node(n)
-        time.sleep(2)
+xml, t = wait_node(timeout=5, desc='Show roots')
+if t is None:
+    xml, t = wait_node(timeout=5, text='Open from')
+if t is not None:
+    tap_node(t)
+    time.sleep(2)
+xml, n = wait_node(timeout=15, regex=r'(?i)(GB|MB|KB) free')
+if n is None:
+    xml, n = wait_node(timeout=5, regex=r'(?i)(internal shared|sdk_|pixel|emulator)')
+check('Storage root found in picker', n is not None)
+if n is not None:
+    tap_node(n)
+    time.sleep(2)
 xml, n = wait_node(timeout=20, text='DupeTest2')
+if n is None:
+    xml, n = scroll_until(text='DupeTest2', swipes=6)
 if n is not None:
     tap_node(n)
 xml, n = wait_node(timeout=20, regex=r'(?i)^use this folder$')
