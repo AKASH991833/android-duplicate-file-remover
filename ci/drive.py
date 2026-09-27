@@ -178,7 +178,7 @@ def confirm_and_delete(expect_button, expect_status, shot_name):
     shot(shot_name)
     if n is None:
         die('no confirm dialog')
-    tap_text(text='Delete permanently')
+    tap_text(regex=r'(?i)^delete permanently$')
     xml, n = wait_node(timeout=300, contains='files deleted')
     status_nodes = find_all(xml, contains='files deleted')
     st = status_nodes[0].get('text') if status_nodes else ''
