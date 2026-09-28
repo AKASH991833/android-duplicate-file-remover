@@ -1,0 +1,56 @@
+PASS: APK installs
+PASS: App launches, home screen shown
+PASS: Runtime permission dialog shown
+PASS: Deny path shows guidance status
+PASS: DocumentsUI picker opened
+PASS: Picker shows Allow-access/Use-this-folder button
+PASS: Folder-mode scan completes
+PASS: Folder-mode finds 1 exact group
+PASS: Select all exact -> Delete (1)
+PASS: Permanent-delete confirmation dialog shown
+PASS: Deletion reports 1 files deleted; 0 skipped
+PASS: SAF delete removed saf2.txt
+PASS: SAF keep saf1.txt survives
+PASS: Full-phone scan completes
+PASS: All-filter summary shows 7 exact file groups
+PASS: Whole-folder hashes identify twin roots/subfolders and empty folders
+PASS: Near-match folder not grouped
+PASS: Look-alike photos are absent
+PASS: Report lists Photos: 4 extra copies
+PASS: Report lists Documents: 3 extra copies
+PASS: Report lists Videos: 1 extra copy
+PASS: Report counts DupeTest folder copies
+PASS: Report counts DupeTest/sub copy
+PASS: Thumbnail opens preview dialog
+PASS: Back on results screen after preview
+PASS: Filter Photos scan completes
+PASS: Filter Photos summary = 3 exact file groups | 
+PASS: Filter Videos scan completes
+PASS: Filter Videos summary = 1 exact file groups | 
+PASS: Filter Documents scan completes
+PASS: Filter Documents summary = 3 exact file groups | 
+PASS: Filter All files scan completes
+PASS: Filter All files summary = 7 exact file groups | 
+PASS: Select all exact -> Delete (8)
+PASS: Permanent-delete confirmation dialog shown
+PASS: Deletion reports 8 files deleted; 0 skipped
+PASS: Deleted from disk: /sdcard/DupeTest/photoA_copy.jpg
+PASS: Deleted from disk: /sdcard/DupeTest/sub/photoA_third.jpg
+PASS: Deleted from disk: /sdcard/DupeTest/big2.jpg
+PASS: Deleted from disk: /sdcard/DupeTest/empty2.jpg
+PASS: Deleted from disk: /sdcard/DupeTest/doc1_copy.txt
+PASS: Deleted from disk: /sdcard/DupeTest/fake2.pdf
+PASS: Deleted from disk: /sdcard/DupeTest/vid2.mp4
+PASS: Deleted from disk: /sdcard/DupeTest/FolderTwinB/sub/a.txt
+PASS: KEEP survives: /sdcard/DupeTest/photoA.jpg
+PASS: KEEP survives: /sdcard/DupeTest/big1.jpg
+PASS: KEEP survives: /sdcard/DupeTest/empty1.jpg
+PASS: KEEP survives: /sdcard/DupeTest/doc1.txt
+PASS: KEEP survives: /sdcard/DupeTest/fake1.pdf
+PASS: KEEP survives: /sdcard/DupeTest/vid1.mp4
+PASS: KEEP survives: /sdcard/DupeTest/FolderTwinA/sub/a.txt
+PASS: KEEP survives: /sdcard/DupeTest/sim_base.jpg
+PASS: KEEP survives: /sdcard/DupeTest/sim_tweak.jpg
+PASS: KEEP survives: /sdcard/DupeTest/unique_photo.jpg
+PASS: KEEP survives: /sdcard/DupeTest/doc2.txt
+PASS: No FATAL EXCEPTION in logcat
